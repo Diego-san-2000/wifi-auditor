@@ -23,9 +23,15 @@ get_security_info() {
         case "$PMF_VALUE" in
             0)
                 PMF="Disabled"
+                SCORE=$((SCORE - 10))
+                PMFNOTES="- 10"
+                OBSERVATIONSPMF="Enable PMF."
                 ;;
             1)
                 PMF="Optional"
+                SCORE=$((SCORE - 10))
+                PMFNOTES="- 10"
+                OBSERVATIONSPMF="Enable PMF."
                 ;;
             2)
                 PMF="Required"

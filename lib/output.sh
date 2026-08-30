@@ -11,20 +11,21 @@ print_header() {
     echo " $1"
     echo "──────────────────────────────────────"
 }
-print_status() {
 
+print_status() {
     if [[ "$1" == "OK" ]]; then
         echo -e "${GREEN}✓ OK${RESET}"
     else
         echo -e "${RED}✗ FAIL${RESET}"
     fi
 }
-calculate_score() {
 
-    # Seguridad Wi-Fi
+calculate_score() {
     case "$SECURITY" in
-        *WEP*|*WEP*)
+        "WEP")
             SCORE=$((SCORE - 50))
+            NOTESSECURITY="- 50"
+            OBSERVATIONSSECURITY="Change Encryption protocol to WPA3."
             ;;
 
         ""|"--"|"Unknown")
@@ -33,10 +34,20 @@ calculate_score() {
 
         *WPA1*)
             SCORE=$((SCORE - 35))
+            NOTESSECURITY="- 35"
+            OBSERVATIONSSECURITY="Change Encryption protocol to WPA3."
+            ;;
+
+        *"WPA1 WPA2"*)
+            SCORE=$((SCORE - 35))
+            NOTESSECURITY="- 35"
+            OBSERVATIONSSECURITY="Change Encryption protocol to WPA3."
             ;;
 
         *WPA2*)
             SCORE=$((SCORE - 10))
+            NOTESSECURITY="- 10"
+            OBSERVATIONSSECURITY="Change Encryption protocol to WPA2."
             ;;
 
         *WPA3*)
@@ -47,29 +58,13 @@ calculate_score() {
 
     # Red abierta
     if [[ "$SECURITY" == "--" || -z "$SECURITY" ]]; then
-        SCORE=$((SCORE - 20))
-    fi
-
-    # PMF
-    if [[ "$PMF" == "Disabled" ]]; then
-        SCORE=$((SCORE - 10))
-    elif [[ "$PMF" == "Required" ]]; then
-        SCORE=$((SCORE + 5))
+        SCORE=$((SCORE - 100))
     fi
 
     # Señal
     if [[ "$SIGNAL_STATUS" == "Poor" ]]; then
         SCORE=$((SCORE - 20))
     elif [[ "$SIGNAL_STATUS" == "Fair" ]]; then
-        SCORE=$((SCORE - 10))
-    fi
-
-    # Conectividad
-    if [[ "$GATEWAY_STATUS" == "FAIL" ]]; then
-        SCORE=$((SCORE - 20))
-    fi
-
-    if [[ "$INTERNET_STATUS" == "FAIL" ]]; then
         SCORE=$((SCORE - 10))
     fi
 
@@ -81,58 +76,94 @@ calculate_score() {
         SCORE=0
     fi
 }
+
 print_report() {
 
     clear
 
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════╗"
-    echo "║          WIFI AUDITOR v0.1           ║"
+    echo "║          WIFI AUDITOR v0.2           ║"
     echo "╚══════════════════════════════════════╝"
 
     print_header "WIFI INFORMATION"
 
-    echo "SSID       : ${SSID:-N/A}"
-    echo "BSSID      : ${BSSID:-N/A}"
-    echo "Interface  : $INTERFACE"
-    echo "Band       : ${BAND:-N/A}"
-    echo "Frequency  : ${FREQUENCY:-N/A} MHz"
-    echo "Channel    : ${CHANNEL:-N/A}"
-    echo "Signal     : ${SIGNAL_DBM:-N/A} ${SIGNAL_UNIT:-dBm}"
-    echo "Signal     : ${SIGNAL_STATUS:-N/A}"
-    echo "TX bitrate : ${BITRATE:-N/A}"
+    echo "SSID         : ${SSID:-N/A}"
+    echo "BSSID        : ${BSSID:-N/A}"
+    echo "Interface    : $INTERFACE"
+    echo "Band         : ${BAND:-N/A}"
+    echo "Frequency    : ${FREQUENCY:-N/A} MHz"
+    echo "Channel      : ${CHANNEL:-N/A}"
+    echo "Signal       : ${SIGNAL_DBM:-N/A} ${SIGNAL_UNIT:-dBm}"
+    echo "Signal       : ${SIGNAL_STATUS:-N/A}"
+    echo "TX bitrate   : ${BITRATE:-N/A}"
 
-    echo -e "${RESET}"
+    echo -en "${RESET}"
 
     print_header "NETWORK & CONNECTIVITY"
 
-    echo "IP         : ${IP_ADDRESS:-N/A}"
-    echo "Gateway    : ${GATEWAY:-N/A}"
-    echo "DNS        : ${DNS:-N/A}"
-    echo -n "Gateway    : "
-    print_status "$GATEWAY_STATUS"
-
-    echo -n "Internet   : "
-    print_status "$INTERNET_STATUS"
+    echo "Local IP     : ${IP_ADDRESS:-N/A}"
+    echo "Gateway      : ${GATEWAY:-N/A} - $GATEWAY_STATUS"
+    echo "DNS          : ${DNS:-N/A}"
+    echo "Internet     : $INTERNET_STATUS"
 
     print_header "SECURITY AUDIT"
 
-    echo "Score      : ${SCORE}/100"
-
     if (( SCORE >= 80 )); then
-        echo -e "Status     : ${GREEN}GOOD${RESET}"
+        echo -e "Status       : ${GREEN}GOOD${RESET}"
     elif (( SCORE >= 60 )); then
-        echo -e "Status     : ${YELLOW}WARNING${RESET}"
+        echo -e "Status       : ${YELLOW}WARNING${RESET}"
     else
-        echo -e "Status     : ${RED}CRITICAL${RESET}"
+        echo -e "Status       : ${RED}CRITICAL${RESET}"
     fi
-    echo "Encryption : ${SECURITY:-Unknown}"
-    echo "PMF        : ${PMF:-Unknown}"
+    echo -e "Encryption   : ${SECURITY:-Unknown} ${RED} ${NOTESSECURITY} ${RESET}"
+    echo -e "PMF          : ${PMF:-Unknown} ${RED} ${PMFNOTES} ${RESET}"
+
+    if [[ ${PASSWORD} == "" ]]; then
+
+        echo "Status       : Unable to analyze"
+        return
+    fi
+    echo "Password     : $PASSWORD"
+    case "$PASSWORD_STRENGTH" in
+        *"Very weak"|"Weak"*)
+            echo -e "Strength     : ${RED}$PASSWORD_STRENGTH $NOTESSTRENGTH${RESET}"
+            ;;
+
+        *"Normal"*)
+            echo -e "Strength     : ${YELLOW}$PASSWORD_STRENGTH$ ${RED}$NOTESSTRENGTH${RESET}"
+            ;;
+
+        "Stong"|"Very strong"*)
+            echo -e "Strength     : ${GREEN}$PASSWORD_STRENGTH$ ${RED}$NOTESSTRENGTH${RESET}"
+            ;;
+    esac
+
+    echo "Entropy      : $PASSWORD_ENTROPY bits"
+
+    case "$PASSWORD_BREACHED" in
+
+        YES)
+            echo -e "Breach status: ${RED}FOUND $NOTESBREACHED${RESET}"
+            ;;
+
+        NO)
+            echo -e "Breach status: ${GREEN}Not found${RESET}"
+            ;;
+
+        *)
+            echo -e "Breach status: ${YELLOW}Unknown${RESET}"
+            ;;
+    esac
+
     printf "\nSecurity Score: ${SCORE}/100"
 
-    printf "\n\nObservations:\n"
+    printf "\n\nObservations:"
     #Poner opciones de mejora
-    
-
-    printf "\nAudit completed.\n"
+    echo -e "${RED}"
+    echo "${OBSERVATIONSBREACHED}"
+    echo "${OBSERVATIONSSTRENGTH}"
+    echo "${OBSERVATIONSPMF}"
+    echo "${OBSERVATIONSSECURITY}"
+    echo -e "${RESET}"
 }

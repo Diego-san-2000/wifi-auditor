@@ -24,8 +24,7 @@ get_wifi_info() {
     SIGNAL_UNIT=$(echo "$WIFI_INFO" |
         awk '/signal:/{print $3}')
 
-    FREQUENCY=$(echo "$WIFI_INFO" |
-        awk '/freq:/{print $2}')
+    [[ "$WIFI_INFO" =~ freq:[[:space:]]*([0-9]+) ]] && FREQUENCY="${BASH_REMATCH[1]}"
 
     BITRATE=$(echo "$WIFI_INFO" |
         awk -F': ' '/tx bitrate:/{print $2}')
